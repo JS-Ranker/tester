@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FaArrowLeft, FaUser, FaIdCard, FaLock, FaEnvelope, FaPhone, FaPaw } from "react-icons/fa";
 import styles from "./Register.module.css";
@@ -136,25 +136,55 @@ const Register = () => {
   // Validar todo el formulario
   const validateForm = () => {
     let isValid = true;
+    const newErrors = { ...errors };
     
-    // Validar cada campo
-    Object.entries(formData).forEach(([key, value]) => {
-      if (key !== 'telefono') { // El teléfono es opcional
-        validateField(key, value);
-        
-        // Si hay algún error, el formulario no es válido
-        if (errors[key as keyof typeof errors]) {
-          isValid = false;
-        }
-      }
-    });
-    
-    // Validaciones adicionales
-    if (!validarRut(formData.rut)) {
-      setErrors(prev => ({...prev, rut: "RUT inválido"}));
+    // Validar cada campo obligatorio
+    if (!formData.nombre) {
+      newErrors.nombre = "El nombre es obligatorio";
       isValid = false;
     }
     
+    if (!formData.apellido) {
+      newErrors.apellido = "El apellido es obligatorio";
+      isValid = false;
+    }
+    
+    if (!formData.rut) {
+      newErrors.rut = "El RUT es obligatorio";
+      isValid = false;
+    } else if (!validarRut(formData.rut)) {
+      newErrors.rut = "RUT inválido";
+      isValid = false;
+    }
+    
+    if (!formData.email) {
+      newErrors.email = "El email es obligatorio";
+      isValid = false;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = "El formato del email no es válido";
+        isValid = false;
+      }
+    }
+    
+    if (!formData.password) {
+      newErrors.password = "La contraseña es obligatoria";
+      isValid = false;
+    } else if (formData.password.length < 6) {
+      newErrors.password = "La contraseña debe tener al menos 6 caracteres";
+      isValid = false;
+    }
+    
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Debe confirmar la contraseña";
+      isValid = false;
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Las contraseñas no coinciden";
+      isValid = false;
+    }
+    
+    setErrors(newErrors);
     return isValid;
   };
 
@@ -183,8 +213,12 @@ const Register = () => {
       // Enviar petición al backend
       const response = await apiService.registrarDueno(userData);
       
-      // Guardar datos del usuario en localStorage
-      localStorage.setItem("currentUser", JSON.stringify(response));
+      // Guardar datos del usuario en localStorage (solo guardamos lo necesario)
+      localStorage.setItem("currentUser", JSON.stringify({
+        rut: response.dueno.rut,
+        nombre: response.dueno.nombre,
+        apellido: response.dueno.apellido
+      }));
       
       // Animación antes de redireccionar
       const registerForm = document.getElementById("registerForm");
@@ -231,7 +265,7 @@ const Register = () => {
         <div className={styles.rightPanel}>
           <div className={styles.formHeader}>
             <Link to="/" className={styles.backLink}>
-              <FaArrowLeft /> <span></span>
+              <FaArrowLeft /> <span>Volver</span>
             </Link>
             <h2 className={styles.formTitle}>Crear Cuenta</h2>
           </div>

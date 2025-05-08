@@ -1,4 +1,4 @@
-// src/services/api.service.ts
+// src/services/duenos.ts - Versión actualizada
 
 // URL base de la API
 const API_URL = 'http://localhost:3000'; // Cambia esto según la URL de tu backend
@@ -10,22 +10,30 @@ export interface IDueno {
   apellido: string;
   email: string;
   telefono?: string;
-  password: string;
+  password?: string; // opcional cuando recibimos del backend
   fecha_registro?: string;
-  activo?: boolean;
+  activo?: boolean | number;
+}
+
+export interface IRegistroResponse {
+  mensaje: string;
+  dueno: IDueno;
 }
 
 export interface ILoginResponse {
-  dueno: IDueno;
-  token: string;
+  mensaje: string;
+  dueno: {
+    rut: string;
+    activo: boolean | number;
+  };
 }
 
 // Servicio para manejar las peticiones a la API
 export const apiService = {
   // Registro de un nuevo dueño
-  async registrarDueno(dueno: Omit<IDueno, 'fecha_registro' | 'activo'>): Promise<IDueno> {
+  async registrarDueno(dueno: Omit<IDueno, 'fecha_registro' | 'activo'>): Promise<IRegistroResponse> {
     try {
-      const response = await fetch(`${API_URL}/duenos`, {
+      const response = await fetch(`${API_URL}/api/duenos`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,11 +43,11 @@ export const apiService = {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al registrar usuario');
+        throw new Error(errorData.error || 'Error al registrar usuario');
       }
 
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error en la petición de registro:', error);
       throw error;
     }
@@ -48,7 +56,7 @@ export const apiService = {
   // Login de un dueño
   async loginDueno(rut: string, password: string): Promise<ILoginResponse> {
     try {
-      const response = await fetch(`${API_URL}/duenos/login`, {
+      const response = await fetch(`${API_URL}/api/duenos/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -58,11 +66,11 @@ export const apiService = {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al iniciar sesión');
+        throw new Error(errorData.error || 'Error al iniciar sesión');
       }
 
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error en la petición de login:', error);
       throw error;
     }
@@ -71,7 +79,7 @@ export const apiService = {
   // Obtener datos de un dueño por RUT
   async obtenerDuenoPorRut(rut: string): Promise<IDueno> {
     try {
-      const response = await fetch(`${API_URL}/duenos/${rut}`, {
+      const response = await fetch(`${API_URL}/api/duenos/${rut}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -82,11 +90,11 @@ export const apiService = {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al obtener datos del usuario');
+        throw new Error(errorData.error || 'Error al obtener datos del usuario');
       }
 
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error en la petición para obtener dueño:', error);
       throw error;
     }
