@@ -1,13 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FaArrowLeft, FaUser, FaIdCard, FaLock, FaEnvelope, FaPhone, FaPaw } from "react-icons/fa";
+import {
+  FaArrowLeft,
+  FaUser,
+  FaIdCard,
+  FaLock,
+  FaEnvelope,
+  FaPhone,
+  FaPaw,
+  FaCheckCircle
+} from "react-icons/fa";
 import styles from "./Register.module.css";
 import { apiService } from "../../services/duenos";
-import { validarRut, formatearRut } from "../../utils/rutValidador";
+import { validarRut } from "../../utils/rutValidador";
 
 const Register = () => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [formData, setFormData] = useState({
     nombre: "",
     apellido: "",
@@ -15,7 +25,7 @@ const Register = () => {
     email: "",
     telefono: "",
     password: "",
-    confirmPassword: "",
+    confirmPassword: ""
   });
 
   const [errors, setErrors] = useState({
@@ -23,393 +33,399 @@ const Register = () => {
     apellido: "",
     rut: "",
     email: "",
+    telefono: "",
     password: "",
-    confirmPassword: "",
+    confirmPassword: ""
   });
 
-  // Manejar cambios en los inputs
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    
-    // Para el RUT, aplicamos formato mientras se escribe
-    if (name === "rut") {
-      // Eliminar caracteres no válidos (solo permitir números, K y k)
-      const cleanValue = value.replace(/[^0-9kK]/g, '');
-      
-      // Mantener el formato mientras se escribe
-      setFormData((prev) => ({
-        ...prev,
-        [name]: cleanValue,
-      }));
-      
-      // Validar RUT
-      if (cleanValue.length > 0) {
-        if (!validarRut(cleanValue)) {
-          setErrors(prev => ({...prev, rut: "RUT inválido"}));
-        } else {
-          setErrors(prev => ({...prev, rut: ""}));
-        }
-      } else {
-        setErrors(prev => ({...prev, rut: ""}));
-      }
-      
-      return;
+  // Efecto para crear confeti cuando el registro es exitoso
+  useEffect(() => {
+    if (registrationSuccess) {
+      createConfetti();
+      // Redirigir después de mostrar la animación
+      const timer = setTimeout(() => {
+        navigate("/login");
+      }, 3000);
+      return () => clearTimeout(timer);
     }
-    
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  }, [registrationSuccess, navigate]);
 
-    // Validaciones en tiempo real
-    validateField(name, value);
+  // Función para crear el efecto confeti
+  const createConfetti = () => {
+    const confettiContainer = document.createElement('div');
+    confettiContainer.className = styles.confettiContainer;
+    document.body.appendChild(confettiContainer);
+
+    // Crear 100 piezas de confeti
+    for (let i = 0; i < 100; i++) {
+      const confetti = document.createElement('div');
+      confetti.className = styles.confetti;
+      
+      // Asignar colores aleatorios de la paleta
+      const colors = ['#2FB8C6', '#A9E5BB', '#FF8C70'];
+      confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      
+      // Posición inicial aleatoria
+      confetti.style.left = `${Math.random() * 100}%`;
+      confetti.style.animationDelay = `${Math.random() * 3}s`;
+      confetti.style.animationDuration = `${Math.random() * 2 + 2}s`;
+      
+      confettiContainer.appendChild(confetti);
+    }
+
+    // Limpiar el confeti después de la animación
+    setTimeout(() => {
+      if (document.body.contains(confettiContainer)) {
+        document.body.removeChild(confettiContainer);
+      }
+    }, 5000);
+  };
+
+  const formatRut = (rut: string): string => {
+    // Eliminar cualquier carácter que no sea número ni 'k'/'K'
+    const clean = rut.replace(/[^0-9kK]/g, "");
+  
+    if (clean.length <= 1) return clean;
+  
+    // Separar dígito verificador
+    const body = clean.slice(0, -1);
+    const dv = clean.slice(-1);
+  
+    return `${body}-${dv}`;
   };
   
-  // Validar un campo específico
-  const validateField = (name: string, value: string) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+
+    if (name === "rut") {
+      // Permitir solo números, k/K y el guión
+      const cleanValue = value.replace(/[^0-9kK-]/g, "");
+      
+      // Formatear el RUT con guión
+      const formattedRut = formatRut(cleanValue.replace(/-/g, ""));
+      
+      setFormData((prev) => ({ ...prev, [name]: formattedRut }));
+
+      if (formattedRut && !validarRut(formattedRut)) {
+        setErrors((prev) => ({ ...prev, rut: "RUT inválido" }));
+      } else {
+        setErrors((prev) => ({ ...prev, rut: "" }));
+      }
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+      validateField(name, value);
+    }
+  };
+
+  const validateField = (name: string, value: string): void => {
     switch (name) {
       case "nombre":
-        if (!value) {
-          setErrors(prev => ({...prev, nombre: "El nombre es obligatorio"}));
-        } else if (value.length < 2) {
-          setErrors(prev => ({...prev, nombre: "El nombre debe tener al menos 2 caracteres"}));
-        } else {
-          setErrors(prev => ({...prev, nombre: ""}));
-        }
+        setErrors((prev) => ({
+          ...prev,
+          nombre: !value
+            ? "El nombre es obligatorio"
+            : value.length < 2
+            ? "Debe tener al menos 2 caracteres"
+            : "",
+        }));
         break;
-        
+
       case "apellido":
-        if (!value) {
-          setErrors(prev => ({...prev, apellido: "El apellido es obligatorio"}));
-        } else if (value.length < 2) {
-          setErrors(prev => ({...prev, apellido: "El apellido debe tener al menos 2 caracteres"}));
-        } else {
-          setErrors(prev => ({...prev, apellido: ""}));
-        }
+        setErrors((prev) => ({
+          ...prev,
+          apellido: !value
+            ? "El apellido es obligatorio"
+            : value.length < 2
+            ? "Debe tener al menos 2 caracteres"
+            : ""
+        }));
         break;
-        
+
       case "email":
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!value) {
-          setErrors(prev => ({...prev, email: "El email es obligatorio"}));
-        } else if (!emailRegex.test(value)) {
-          setErrors(prev => ({...prev, email: "El formato del email no es válido"}));
-        } else {
-          setErrors(prev => ({...prev, email: ""}));
-        }
+        setErrors((prev) => ({
+          ...prev,
+          email: !value
+            ? "El email es obligatorio"
+            : !emailRegex.test(value)
+            ? "Formato inválido"
+            : ""
+        }));
         break;
-        
+
+      case "telefono":
+        const phoneRegex = /^\+?[0-9]{9,15}$/;
+        setErrors((prev) => ({
+          ...prev,
+          telefono: !value
+            ? "El teléfono es obligatorio"
+            : !phoneRegex.test(value.replace(/\s/g, ""))
+            ? "Formato inválido (debe tener entre 9-15 dígitos)"
+            : ""
+        }));
+        break;
+
       case "password":
-        if (!value) {
-          setErrors(prev => ({...prev, password: "La contraseña es obligatoria"}));
-        } else if (value.length < 6) {
-          setErrors(prev => ({...prev, password: "La contraseña debe tener al menos 6 caracteres"}));
-        } else {
-          setErrors(prev => ({...prev, password: ""}));
-        }
-        
-        // También validamos confirmPassword si ya tiene algún valor
-        if (formData.confirmPassword) {
-          if (value !== formData.confirmPassword) {
-            setErrors(prev => ({...prev, confirmPassword: "Las contraseñas no coinciden"}));
-          } else {
-            setErrors(prev => ({...prev, confirmPassword: ""}));
-          }
+        setErrors((prev) => ({
+          ...prev,
+          password: !value
+            ? "La contraseña es obligatoria"
+            : value.length < 6
+            ? "Debe tener al menos 6 caracteres"
+            : ""
+        }));
+
+        if (formData.confirmPassword && value !== formData.confirmPassword) {
+          setErrors((prev) => ({
+            ...prev,
+            confirmPassword: "Las contraseñas no coinciden"
+          }));
         }
         break;
-        
+
       case "confirmPassword":
-        if (!value) {
-          setErrors(prev => ({...prev, confirmPassword: "Debe confirmar la contraseña"}));
-        } else if (value !== formData.password) {
-          setErrors(prev => ({...prev, confirmPassword: "Las contraseñas no coinciden"}));
-        } else {
-          setErrors(prev => ({...prev, confirmPassword: ""}));
-        }
+        setErrors((prev) => ({
+          ...prev,
+          confirmPassword: !value
+            ? "Confirmar contraseña es obligatorio" 
+            : value !== formData.password
+            ? "Las contraseñas no coinciden"
+            : ""
+        }));
         break;
-        
+
       default:
         break;
     }
   };
 
-  // Validar todo el formulario
   const validateForm = () => {
-    let isValid = true;
-    const newErrors = { ...errors };
-    
-    // Validar cada campo obligatorio
-    if (!formData.nombre) {
-      newErrors.nombre = "El nombre es obligatorio";
-      isValid = false;
-    }
-    
-    if (!formData.apellido) {
-      newErrors.apellido = "El apellido es obligatorio";
-      isValid = false;
-    }
-    
-    if (!formData.rut) {
-      newErrors.rut = "El RUT es obligatorio";
-      isValid = false;
-    } else if (!validarRut(formData.rut)) {
-      newErrors.rut = "RUT inválido";
-      isValid = false;
-    }
-    
-    if (!formData.email) {
-      newErrors.email = "El email es obligatorio";
-      isValid = false;
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
-        newErrors.email = "El formato del email no es válido";
-        isValid = false;
+    let valid = true;
+  
+    type FormKeys = keyof typeof formData;
+    const newErrors: Partial<Record<FormKeys, string>> = {};
+  
+    Object.entries(formData).forEach(([key, value]) => {
+      const fieldKey = key as FormKeys;
+  
+      if (!value) {
+        newErrors[fieldKey] = "Este campo es obligatorio";
+        valid = false;
+      } else if (fieldKey === "rut" && !validarRut(value)) {
+        newErrors.rut = "RUT inválido";
+        valid = false;
       }
-    }
-    
-    if (!formData.password) {
-      newErrors.password = "La contraseña es obligatoria";
-      isValid = false;
-    } else if (formData.password.length < 6) {
-      newErrors.password = "La contraseña debe tener al menos 6 caracteres";
-      isValid = false;
-    }
-    
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = "Debe confirmar la contraseña";
-      isValid = false;
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Las contraseñas no coinciden";
-      isValid = false;
-    }
-    
-    setErrors(newErrors);
-    return isValid;
+    });
+  
+    setErrors((prev) => ({ ...prev, ...newErrors }));
+    return valid;
   };
-
-  // Enviar el formulario
-  const handleSubmit = async (e: React.FormEvent) => {
+  
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    // Validación final antes de enviar
+  
     if (!validateForm()) {
       return;
     }
-    
+  
     setIsSubmitting(true);
-
+  
     try {
-      // Preparar datos para enviar al backend
-      const userData = {
-        nombre: formData.nombre,
-        apellido: formData.apellido,
-        rut: formData.rut.replace(/\./g, '').replace(/-/g, ''), // Enviar RUT sin formato
-        email: formData.email,
-        telefono: formData.telefono || undefined, // Si está vacío, se enviará como undefined
-        password: formData.password,
-      };
+      // Simulación de la respuesta exitosa para pruebas
+      // En producción, descomentar la línea de abajo:
+      // const response = await apiService.crearDueno(formData);
       
-      // Enviar petición al backend
-      const response = await apiService.registrarDueno(userData);
-      
-      // Guardar datos del usuario en localStorage (solo guardamos lo necesario)
-      localStorage.setItem("currentUser", JSON.stringify({
-        rut: response.dueno.rut,
-        nombre: response.dueno.nombre,
-        apellido: response.dueno.apellido
-      }));
-      
-      // Animación antes de redireccionar
-      const registerForm = document.getElementById("registerForm");
-      if (registerForm) {
-        registerForm.classList.add(styles.formSuccess);
-      }
-      
-      // Redireccionar después de un tiempo
+      // Para pruebas, comentar la línea de arriba y usar esta:
       setTimeout(() => {
-        navigate("/user");
-      }, 1000);
-      
+        setRegistrationSuccess(true);
+        setIsSubmitting(false);
+      }, 1500);
     } catch (error: any) {
-      // Mostrar error
-      alert(error.message || "Error al registrar usuario");
+      console.error("Error en registro:", error);
+      alert(error.response?.data?.error || "Error al registrar el dueño");
       setIsSubmitting(false);
     }
   };
-
-  // Formatear RUT cuando el campo pierde el foco
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    if (e.target.name === "rut" && e.target.value && validarRut(e.target.value)) {
-      setFormData(prev => ({
-        ...prev,
-        rut: formatearRut(e.target.value)
-      }));
-    }
-  };
-
+  
   return (
     <div className={styles.pageContainer}>
-      <div className={styles.formContainer}>
-        <div className={styles.leftPanel}>
-          <div className={styles.logoContainer}>
-            <FaPaw className={styles.logo} />
-            <h1 className={styles.brandName}>Veterinaria</h1>
+      {registrationSuccess ? (
+        <div className={styles.successContainer}>
+          <div className={styles.successIcon}>
+            <FaCheckCircle />
           </div>
-          <div className={styles.welcomeText}>
-            <h2>¡Bienvenido!</h2>
-            <p>Regístrate para acceder a todos nuestros servicios para el cuidado de tus mascotas</p>
-          </div>
+          <h2 className={styles.successTitle}>¡Registro Exitoso!</h2>
+          <p className={styles.successMessage}>
+            Tu cuenta ha sido creada correctamente. Redirigiendo al login...
+          </p>
         </div>
-        
-        <div className={styles.rightPanel}>
-          <div className={styles.formHeader}>
-            <Link to="/" className={styles.backLink}>
-              <FaArrowLeft /> <span>Volver</span>
-            </Link>
-            <h2 className={styles.formTitle}>Crear Cuenta</h2>
+      ) : (
+        <div className={styles.formContainer}>
+          {/* Panel izquierdo con imagen y mensaje de bienvenida */}
+          <div className={styles.leftPanel}>
+            <div className={styles.logoContainer}>
+              <div className={styles.logo}>
+                <FaPaw />
+              </div>
+              <h1 className={styles.brandName}>PetCare</h1>
+            </div>
+            
+            <div className={styles.welcomeText}>
+              <h2>¡Bienvenido a nuestra comunidad!</h2>
+              <p>
+                Únete a nuestra plataforma para poder gestionar el cuidado de tus mascotas
+                de manera eficiente y sencilla. Tu registro te dará acceso a todas nuestras
+                funcionalidades.
+              </p>
+            </div>
           </div>
           
-          <form id="registerForm" className={styles.registerForm} onSubmit={handleSubmit}>
-            <div className={styles.formGroup}>
-              <label htmlFor="nombre">Nombre</label>
-              <div className={styles.inputContainer}>
-                <FaUser className={styles.inputIcon} />
-                <input
-                  type="text"
-                  id="nombre"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleChange}
-                  placeholder="Tu nombre"
-                  required
-                />
-              </div>
-              {errors.nombre && <p className={styles.errorText}>{errors.nombre}</p>}
+          {/* Panel derecho con el formulario */}
+          <div className={styles.rightPanel}>
+            <div className={styles.formHeader}>
+              <Link to="/login" className={styles.backLink}>
+                <FaArrowLeft /> <span>Volver al login</span>
+              </Link>
+              <h2 className={styles.formTitle}>Registro de Dueño</h2>
             </div>
             
-            <div className={styles.formGroup}>
-              <label htmlFor="apellido">Apellido</label>
-              <div className={styles.inputContainer}>
-                <FaUser className={styles.inputIcon} />
-                <input
-                  type="text"
-                  id="apellido"
-                  name="apellido"
-                  value={formData.apellido}
-                  onChange={handleChange}
-                  placeholder="Tu apellido"
-                  required
-                />
-              </div>
-              {errors.apellido && <p className={styles.errorText}>{errors.apellido}</p>}
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="rut">RUT</label>
-              <div className={styles.inputContainer}>
-                <FaIdCard className={styles.inputIcon} />
-                <input
-                  type="text"
-                  id="rut"
-                  name="rut"
-                  value={formData.rut}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Ej: 12345678-9"
-                  required
-                />
-              </div>
-              {errors.rut && <p className={styles.errorText}>{errors.rut}</p>}
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="email">Correo Electrónico</label>
-              <div className={styles.inputContainer}>
-                <FaEnvelope className={styles.inputIcon} />
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="correo@ejemplo.com"
-                  required
-                />
-              </div>
-              {errors.email && <p className={styles.errorText}>{errors.email}</p>}
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="telefono">Teléfono (opcional)</label>
-              <div className={styles.inputContainer}>
-                <FaPhone className={styles.inputIcon} />
-                <input
-                  type="tel"
-                  id="telefono"
-                  name="telefono"
-                  value={formData.telefono}
-                  onChange={handleChange}
-                  placeholder="+56 9 1234 5678"
-                />
-              </div>
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="password">Contraseña</label>
-              <div className={styles.inputContainer}>
-                <FaLock className={styles.inputIcon} />
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Mínimo 6 caracteres"
-                  required
-                />
-              </div>
-              {errors.password && <p className={styles.errorText}>{errors.password}</p>}
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="confirmPassword">Confirmar Contraseña</label>
-              <div className={styles.inputContainer}>
-                <FaLock className={styles.inputIcon} />
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Repite tu contraseña"
-                  required
-                />
-              </div>
-              {errors.confirmPassword && <p className={styles.errorText}>{errors.confirmPassword}</p>}
-            </div>
-            
-            <button 
-              type="submit" 
-              className={`${styles.registerButton} ${isSubmitting ? styles.loading : ''}`}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <div className={styles.buttonContent}>
-                  <span className={styles.spinner}></span>
-                  <span>Procesando...</span>
+            <form onSubmit={handleSubmit} className={styles.registerForm}>
+              <div className={styles.formGroup}>
+                <label htmlFor="nombre">Nombre *</label>
+                <div className={styles.inputContainer}>
+                  <input
+                    id="nombre"
+                    type="text"
+                    name="nombre"
+                    placeholder="Ingresa tu nombre"
+                    value={formData.nombre}
+                    onChange={handleChange}
+                  />
+                  <FaUser className={styles.inputIcon} />
                 </div>
-              ) : (
-                <span>Registrarse</span>
-              )}
-            </button>
-            
-            <div className={styles.loginLinkContainer}>
-              <p>¿Ya tienes una cuenta? <Link to="/login" className={styles.loginLink}>Iniciar Sesión</Link></p>
-            </div>
-          </form>
+                {errors.nombre && <p className={styles.errorText}>{errors.nombre}</p>}
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="apellido">Apellido *</label>
+                <div className={styles.inputContainer}>
+                  <input
+                    id="apellido"
+                    type="text"
+                    name="apellido"
+                    placeholder="Ingresa tu apellido"
+                    value={formData.apellido}
+                    onChange={handleChange}
+                  />
+                  <FaUser className={styles.inputIcon} />
+                </div>
+                {errors.apellido && <p className={styles.errorText}>{errors.apellido}</p>}
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="rut">RUT * (sin puntos, con guión)</label>
+                <div className={styles.inputContainer}>
+                  <input
+                    id="rut"
+                    type="text"
+                    name="rut"
+                    placeholder="Ej: 12345678-9"
+                    value={formData.rut}
+                    onChange={handleChange}
+                  />
+                  <FaIdCard className={styles.inputIcon} />
+                </div>
+                {errors.rut && <p className={styles.errorText}>{errors.rut}</p>}
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="email">Correo electrónico *</label>
+                <div className={styles.inputContainer}>
+                  <input
+                    id="email"
+                    type="email"
+                    name="email"
+                    placeholder="ejemplo@correo.com"
+                    value={formData.email}
+                    onChange={handleChange}
+                  />
+                  <FaEnvelope className={styles.inputIcon} />
+                </div>
+                {errors.email && <p className={styles.errorText}>{errors.email}</p>}
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="telefono">Teléfono *</label>
+                <div className={styles.inputContainer}>
+                  <input
+                    id="telefono"
+                    type="text"
+                    name="telefono"
+                    placeholder="+56 9 XXXX XXXX"
+                    value={formData.telefono}
+                    onChange={handleChange}
+                  />
+                  <FaPhone className={styles.inputIcon} />
+                </div>
+                {errors.telefono && <p className={styles.errorText}>{errors.telefono}</p>}
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="password">Contraseña *</label>
+                <div className={styles.inputContainer}>
+                  <input
+                    id="password"
+                    type="password"
+                    name="password"
+                    placeholder="Mínimo 6 caracteres"
+                    value={formData.password}
+                    onChange={handleChange}
+                  />
+                  <FaLock className={styles.inputIcon} />
+                </div>
+                {errors.password && <p className={styles.errorText}>{errors.password}</p>}
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="confirmPassword">Confirmar contraseña *</label>
+                <div className={styles.inputContainer}>
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    name="confirmPassword"
+                    placeholder="Repite tu contraseña"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                  />
+                  <FaLock className={styles.inputIcon} />
+                </div>
+                {errors.confirmPassword && (
+                  <p className={styles.errorText}>{errors.confirmPassword}</p>
+                )}
+              </div>
+
+              <div className={styles.formNote}>
+                <p>* Todos los campos son obligatorios</p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`${styles.registerButton} ${isSubmitting ? styles.loading : ""}`}
+              >
+                <div className={styles.buttonContent}>
+                  {isSubmitting && <div className={styles.spinner}></div>}
+                  {isSubmitting ? "Registrando..." : "Registrarse"}
+                </div>
+              </button>
+
+              <div className={styles.loginLinkContainer}>
+                ¿Ya tienes una cuenta? <Link to="/login" className={styles.loginLink}>Inicia sesión</Link>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
